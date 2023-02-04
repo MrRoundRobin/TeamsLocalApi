@@ -1,4 +1,4 @@
-﻿namespace ms.robin.TeamsLocalApi;
+﻿namespace ro.TeamsLocalApi;
 
 internal class ServerMessage
 {
@@ -8,7 +8,7 @@ internal class ServerMessage
 
 internal class MeetingUpdate
 {
-    public MeetingState MeetingState { get; set; } = new ();
+    public MeetingState MeetingState { get; set; } = new();
     public MeetingPermissions MeetingPermissions { get; set; } = new();
 
 }

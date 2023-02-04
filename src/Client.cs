@@ -4,7 +4,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 
-namespace ms.robin.TeamsLocalApi;
+namespace ro.TeamsLocalApi;
 
 public class Client : INotifyPropertyChanged
 {
@@ -16,13 +16,13 @@ public class Client : INotifyPropertyChanged
     public bool IsBackgroundBlurred { get => isBackgroundBlurred; set { SendCommand(value ? MeetingAction.BlurBackground : MeetingAction.UnblurBackground); } }
     public bool IsConnected => ws is not null && ws.State == WebSocketState.Open;
 
-    public bool CanToggleMute   { get; private set; }
-    public bool CanToggleVideo  { get; private set; }
-    public bool CanToggleHand   { get; private set; }
-    public bool CanToggleBlur   { get; private set; }
+    public bool CanToggleMute { get; private set; }
+    public bool CanToggleVideo { get; private set; }
+    public bool CanToggleHand { get; private set; }
+    public bool CanToggleBlur { get; private set; }
     public bool CanToggleRecord { get; private set; }
-    public bool CanLeave        { get; private set; }
-    public bool CanReact        { get; private set; }
+    public bool CanLeave { get; private set; }
+    public bool CanReact { get; private set; }
 
     private bool isMuted;
     private bool isCameraOn;
@@ -51,7 +51,7 @@ public class Client : INotifyPropertyChanged
     public async void Disconnect()
     {
         if (ws is null) return;
-        
+
         await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, null, default);
     }
 
@@ -62,13 +62,13 @@ public class Client : INotifyPropertyChanged
 
         if (Process.GetProcessesByName("Teams").Length == 0)
             return;
-        
+
         ws = new();
 
         try
         {
             await ws.ConnectAsync(Uri, default);
-        } 
+        }
         catch (WebSocketException)
         {
             throw;
@@ -122,19 +122,19 @@ public class Client : INotifyPropertyChanged
                     isCameraOn = message.MeetingUpdate.MeetingState.IsCameraOn;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCameraOn)));
                 }
-                
+
                 if (isHandRaised != message.MeetingUpdate.MeetingState.IsHandRaised)
                 {
                     isHandRaised = message.MeetingUpdate.MeetingState.IsHandRaised;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHandRaised)));
                 }
-                
+
                 if (isInMeeting != message.MeetingUpdate.MeetingState.IsInMeeting)
                 {
                     isInMeeting = message.MeetingUpdate.MeetingState.IsInMeeting;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInMeeting)));
                 }
-                
+
                 if (isRecordingOn != message.MeetingUpdate.MeetingState.IsRecordingOn)
                 {
                     isRecordingOn = message.MeetingUpdate.MeetingState.IsRecordingOn;

@@ -4,7 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>ms.robin.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+    <RootNamespace>ro.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
     <Authors>RoundRobin</Authors>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -14,7 +14,21 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>Microsoft Teams; API</PackageTags>
     <PackageReleaseNotes>Initial Release</PackageReleaseNotes>
+    <PackageId>Ro.$(AssemblyName)</PackageId>
+    <Description>API Client for the client side Teams API</Description>
+    <PackageProjectUrl>https://github.com/MrRoundRobin/TeamsLocalApi</PackageProjectUrl>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <Version>$(AssemblyVersion)</Version>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Macross.Json.Extensions" Version="3.0.0" />
