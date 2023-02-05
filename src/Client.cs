@@ -8,12 +8,12 @@ namespace ro.TeamsLocalApi;
 
 public class Client : INotifyPropertyChanged
 {
-    public bool IsMuted { get => isMuted; set { SendCommand(value ? MeetingAction.Mute : MeetingAction.Unmute); } }
-    public bool IsCameraOn { get => isCameraOn; set { SendCommand(value ? MeetingAction.ShowVideo : MeetingAction.HideVideo); } }
-    public bool IsHandRaised { get => isHandRaised; set { SendCommand(value ? MeetingAction.RaiseHand : MeetingAction.LowerHand); } }
+    public bool IsMuted { get => isMuted; set { _ = SendCommand(value ? MeetingAction.Mute : MeetingAction.Unmute); } }
+    public bool IsCameraOn { get => isCameraOn; set { _ = SendCommand(value ? MeetingAction.ShowVideo : MeetingAction.HideVideo); } }
+    public bool IsHandRaised { get => isHandRaised; set { _ = SendCommand(value ? MeetingAction.RaiseHand : MeetingAction.LowerHand); } }
     public bool IsInMeeting { get => isInMeeting; }
-    public bool IsRecordingOn { get => isRecordingOn; set { SendCommand(value ? MeetingAction.StartRecording : MeetingAction.StopRecording); } }
-    public bool IsBackgroundBlurred { get => isBackgroundBlurred; set { SendCommand(value ? MeetingAction.BlurBackground : MeetingAction.UnblurBackground); } }
+    public bool IsRecordingOn { get => isRecordingOn; set { _ = SendCommand(value ? MeetingAction.StartRecording : MeetingAction.StopRecording); } }
+    public bool IsBackgroundBlurred { get => isBackgroundBlurred; set { _ = SendCommand(value ? MeetingAction.BlurBackground : MeetingAction.UnblurBackground); } }
     public bool IsConnected => ws is not null && ws.State == WebSocketState.Open;
 
     public bool CanToggleMute { get; private set; }
@@ -24,6 +24,9 @@ public class Client : INotifyPropertyChanged
     public bool CanLeave { get; private set; }
     public bool CanReact { get; private set; }
 
+    public string Manufacturer { get; set; } = "Elgato";
+    public string Device { get; set; } = "Stream Deck";
+
     private bool isMuted;
     private bool isCameraOn;
     private bool isHandRaised;
@@ -31,13 +34,15 @@ public class Client : INotifyPropertyChanged
     private bool isRecordingOn;
     private bool isBackgroundBlurred;
 
-    private const string Manufacturer = "Elgato";
-    private const string Device = "Stream Deck";
+    private static readonly SemaphoreSlim sendSemaphore    = new(0, 1);
+    private static readonly SemaphoreSlim receiveSemaphore = new(0, 1);
 
     private readonly Uri Uri;
     private ClientWebSocket? ws;
 
-    public event EventHandler? Closed;
+    public event EventHandler? Disconnected;
+    public event EventHandler? Connected;
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public Client(string token, bool autoConnect = false)
@@ -45,71 +50,106 @@ public class Client : INotifyPropertyChanged
         Uri = new($"ws://localhost:8124?token={token}");
 
         if (autoConnect)
-            Connect();
+            _ = Connect();
     }
 
-    public async void Disconnect()
+    public async Task Disconnect()
     {
         if (ws is null) return;
 
-        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, null, default);
+        var initialState = ws.State; 
+
+        switch (ws.State)
+        {
+            case WebSocketState.Open:
+            case WebSocketState.Connecting:
+                await ws!.CloseAsync(WebSocketCloseStatus.NormalClosure, null, default);
+                break;
+            case WebSocketState.CloseReceived:
+            case WebSocketState.CloseSent:
+                await WaitClose();
+                break;
+            case WebSocketState.Aborted:
+            case WebSocketState.Closed:
+            case WebSocketState.None:
+                break;
+        }
+
+        ws.Dispose();
+        ws = null;
+
+        if (initialState != WebSocketState.Closed)
+            Disconnected?.Invoke(this, EventArgs.Empty);
     }
 
-    private async Task Reconnect()
+    public async Task Reconnect()
     {
-        if (ws?.State == WebSocketState.Open)
-            await ws.CloseAsync(WebSocketCloseStatus.Empty, null, default);
+        await Disconnect();
+        await Connect();
+    }
 
-        if (Process.GetProcessesByName("Teams").Length == 0)
-            return;
+    private async Task WaitClose()
+    {
+        if (ws is null) return;
 
-        ws = new();
+        while (ws.State != WebSocketState.Closed && ws.State != WebSocketState.Aborted)
+            await Task.Delay(25);
+    }
+
+    private async Task WaitOpen()
+    {
+        if (ws is null) throw new InvalidOperationException();
+
+        while (ws.State == WebSocketState.Connecting)
+            await Task.Delay(25);
+    }
+
+    private async void Receive()
+    {
+        if (ws is null || ws.State != WebSocketState.Open)
+            throw new InvalidOperationException("Not connected");
 
         try
         {
-            await ws.ConnectAsync(Uri, default);
-        }
-        catch (WebSocketException)
-        {
-            throw;
-        }
-    }
+            await receiveSemaphore.WaitAsync();
 
-    public async void Connect()
-    {
-        await Reconnect();
-
-        if (ws is null)
-            return;
-
-        var buffer = new byte[1024];
-
-        while (true)
-        {
-            var result = await ws.ReceiveAsync(buffer, default);
-
-            if (result.CloseStatus.HasValue)
+            var buffer = new byte[1024];
+            
+            while (true)
             {
-                if (ws.CloseStatus != WebSocketCloseStatus.NormalClosure)
+                var result = await ws.ReceiveAsync(buffer, default);
+
+                if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    await Reconnect();
-                    continue;
+                    if (ws.CloseStatus != WebSocketCloseStatus.NormalClosure)
+                    {
+                        Disconnected?.Invoke(this, EventArgs.Empty);
+                        _ = Reconnect();
+                    }
+
+                    return;
                 }
-                Closed?.Invoke(this, EventArgs.Empty);
-                break;
-            }
 
-            if (!result.EndOfMessage || result.Count == 0)
-                throw new NotImplementedException("Invalid Message received");
+                if (!result.EndOfMessage || result.Count == 0)
+                    throw new NotImplementedException("Invalid Message received");
 
-            string data = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                var data = Encoding.UTF8.GetString(buffer, 0, result.Count);
 
-            try
-            {
                 var message = JsonSerializer.Deserialize<ServerMessage>(data, new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                }) ?? throw new ArgumentNullException();
+                }) ?? throw new InvalidDataException();
+
+                if (!string.IsNullOrEmpty(message.ErrorMsg))
+                {
+                    if (message.ErrorMsg.EndsWith("no active call"))
+                        continue;
+
+                    throw new Exception(message.ErrorMsg);
+                }
+
+                if (message.MeetingUpdate is null)
+                    continue;
 
                 if (isMuted != message.MeetingUpdate.MeetingState.IsMuted)
                 {
@@ -189,16 +229,76 @@ public class Client : INotifyPropertyChanged
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanReact)));
                 }
             }
-            catch (Exception ex)
-            {
-                throw new NotImplementedException("Invalid Message received", ex);
-            }
+        } 
+        finally
+        {
+            receiveSemaphore.Release();
         }
     }
 
-    private async void SendCommand(MeetingAction action)
+    public async Task Connect()
     {
-        if (ws is null || ws.State != WebSocketState.Open) return;
+        if (Process.GetProcessesByName("Teams").Length == 0)
+            return;
+
+        if (ws is not null)
+        {
+            switch (ws.State)
+            {
+                case WebSocketState.Open:
+                case WebSocketState.Connecting:
+                    return;
+                case WebSocketState.Aborted:
+                case WebSocketState.Closed:
+                case WebSocketState.None:
+                    await Disconnect();
+                    break;
+                case WebSocketState.CloseReceived:
+                case WebSocketState.CloseSent:
+                    await WaitClose();
+                    await Disconnect();
+                    break;
+            }
+        }
+
+        ws = new();
+
+        await ws.ConnectAsync(Uri, default);
+
+        await WaitOpen();
+
+        if (ws.State == WebSocketState.Open)
+        {
+            Connected?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            throw new WebSocketException($"Invalid state after connect: ${ws.State}");
+        }
+
+        Receive();
+    }
+
+    private async Task SendCommand(MeetingAction action)
+    {
+        if (ws is null) throw new InvalidOperationException("Not Connected");
+
+        switch (ws.State)
+        {
+            case WebSocketState.Aborted:
+            case WebSocketState.CloseReceived:
+                await Connect();
+                break;
+            case WebSocketState.Connecting:
+                await WaitOpen();
+                break;
+            case WebSocketState.CloseSent:
+            case WebSocketState.Closed:
+                throw new InvalidOperationException("Not Connected");
+            case WebSocketState.Open:
+            case WebSocketState.None:
+                break;
+        }
 
         var message = JsonSerializer.Serialize(new ClientMessage()
         {
@@ -210,20 +310,18 @@ public class Client : INotifyPropertyChanged
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         });
 
+        await sendSemaphore.WaitAsync();
+
         await ws.SendAsync(Encoding.UTF8.GetBytes(message), WebSocketMessageType.Text, true, default);
+
+        sendSemaphore.Release();
     }
 
-    public void LeaveCall() => SendCommand(MeetingAction.LeaveCall);
-
-    public void ReactApplause() => SendCommand(MeetingAction.ReactApplause);
-
-    public void ReactLaugh() => SendCommand(MeetingAction.ReactLaugh);
-
-    public void ReactLike() => SendCommand(MeetingAction.ReactLike);
-
-    public void ReactLove() => SendCommand(MeetingAction.ReactLove);
-
-    public void ReactWow() => SendCommand(MeetingAction.ReactWow);
-
-    public void UpdateState() => SendCommand(MeetingAction.QueryMeetingState);
+    public async Task LeaveCall() => await SendCommand(MeetingAction.LeaveCall);
+    public async Task ReactApplause() => await SendCommand(MeetingAction.ReactApplause);
+    public async Task ReactLaugh() => await SendCommand(MeetingAction.ReactLaugh);
+    public async Task ReactLike() => await SendCommand(MeetingAction.ReactLike);
+    public async Task ReactLove() => await SendCommand(MeetingAction.ReactLove);
+    public async Task ReactWow() => await SendCommand(MeetingAction.ReactWow);
+    public async Task UpdateState() => await SendCommand(MeetingAction.QueryMeetingState);
 }

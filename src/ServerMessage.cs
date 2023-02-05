@@ -3,7 +3,8 @@
 internal class ServerMessage
 {
     public string ApiVersion { get; set; } = "1.0.0.0";
-    public MeetingUpdate MeetingUpdate { get; set; } = new();
+    public string? ErrorMsg { get; set; }
+    public MeetingUpdate? MeetingUpdate { get; set; }
 }
 
 internal class MeetingUpdate
