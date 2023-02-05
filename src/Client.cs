@@ -252,10 +252,6 @@ public class Client : INotifyPropertyChanged
                 }
             }
         }
-        catch (Exception e)
-        {
-            Debugger.Break();
-        }
         finally
         {
             receiveSemaphore.Release();
