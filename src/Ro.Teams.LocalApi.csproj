@@ -14,7 +14,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>Microsoft Teams; API</PackageTags>
     <PackageReleaseNotes>improved resilience &amp; error handling</PackageReleaseNotes>
-    <PackageId>Ro.$(AssemblyName)</PackageId>
+    <PackageId>$(AssemblyName)</PackageId>
     <Description>API Client for the client side Teams API</Description>
     <PackageProjectUrl>https://github.com/MrRoundRobin/TeamsLocalApi</PackageProjectUrl>
     <AssemblyVersion>0.3.0.0</AssemblyVersion>
