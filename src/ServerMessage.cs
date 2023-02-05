@@ -1,4 +1,4 @@
-﻿namespace ro.TeamsLocalApi;
+﻿namespace Ro.Teams.LocalApi;
 
 internal class ServerMessage
 {

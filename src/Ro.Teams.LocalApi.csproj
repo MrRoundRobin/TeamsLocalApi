@@ -1,10 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>ro.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+    <RootNamespace>$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
     <Authors>RoundRobin</Authors>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -17,7 +17,7 @@
     <PackageId>Ro.$(AssemblyName)</PackageId>
     <Description>API Client for the client side Teams API</Description>
     <PackageProjectUrl>https://github.com/MrRoundRobin/TeamsLocalApi</PackageProjectUrl>
-    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <AssemblyVersion>0.3.0.0</AssemblyVersion>
     <FileVersion>$(AssemblyVersion)</FileVersion>
     <Version>$(AssemblyVersion)</Version>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>

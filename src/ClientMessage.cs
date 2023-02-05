@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace ro.TeamsLocalApi;
+namespace Ro.Teams.LocalApi;
 
 internal class ClientMessage
 {
