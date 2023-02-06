@@ -5,5 +5,5 @@ Use this Package to communicate with the [Microsoft Teams Third-party app API](h
 ## Usage
 
 ```
-dotnet add package Ro.TeamsLocalApi --version 0.2.0 --prerelease
+dotnet add package Ro.Teams.LocalApi --version 0.3.0 --prerelease
 ```
