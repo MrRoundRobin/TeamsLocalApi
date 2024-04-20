@@ -2,14 +2,16 @@
 
 internal class ServerMessage
 {
-    public string ApiVersion { get; set; } = "1.0.0.0";
+    public int? RequestId = 0;
+    public string? Response { get; set; }
     public string? ErrorMsg { get; set; }
+    public string? TokenRefresh { get; set; }
     public MeetingUpdate? MeetingUpdate { get; set; }
 }
 
 internal class MeetingUpdate
 {
-    public MeetingState MeetingState { get; set; } = new();
+    public MeetingState? MeetingState { get; set; }
     public MeetingPermissions MeetingPermissions { get; set; } = new();
 
 }
@@ -17,12 +19,13 @@ internal class MeetingUpdate
 internal class MeetingState
 {
     public bool IsMuted { get; set; }
-    public bool IsCameraOn { get; set; }
     public bool IsHandRaised { get; set; }
     public bool IsInMeeting { get; set; }
     public bool IsRecordingOn { get; set; }
     public bool IsBackgroundBlurred { get; set; }
-
+    public bool IsSharing { get; set; }
+    public bool HasUnreadMessages { get; set; }
+    public bool IsVideoOn { get; set; }
 }
 
 internal class MeetingPermissions
@@ -31,7 +34,10 @@ internal class MeetingPermissions
     public bool CanToggleVideo { get; set; }
     public bool CanToggleHand { get; set; }
     public bool CanToggleBlur { get; set; }
-    public bool CanToggleRecord { get; set; }
     public bool CanLeave { get; set; }
     public bool CanReact { get; set; }
+    public bool CanToggleShareTray { get; set; }
+    public bool CanToggleChat { get; set; }
+    public bool CanStopSharing { get; set; }
+    public bool CanPair { get; set; }
 }

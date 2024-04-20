@@ -3,43 +3,59 @@ using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using Ro.Teams.LocalApi.EventArgs;
 
 namespace Ro.Teams.LocalApi;
 
 public class Client : INotifyPropertyChanged
 {
-    public bool IsMuted { get => isMuted; set { if (value != IsMuted) _ = SendCommand(value ? MeetingAction.Mute : MeetingAction.Unmute); } }
-    public bool IsCameraOn { get => isCameraOn; set { if (value != IsCameraOn) _ = SendCommand(value ? MeetingAction.ShowVideo : MeetingAction.HideVideo); } }
-    public bool IsHandRaised { get => isHandRaised; set { if (value != IsHandRaised) _ = SendCommand(value ? MeetingAction.RaiseHand : MeetingAction.LowerHand); } }
-    public bool IsInMeeting { get => isInMeeting; }
-    public bool IsRecordingOn { get => isRecordingOn; set { if (value != isRecordingOn) _ = SendCommand(value ? MeetingAction.StartRecording : MeetingAction.StopRecording); } }
     public bool IsBackgroundBlurred { get => isBackgroundBlurred; set { if (value != IsBackgroundBlurred) _ = SendCommand(value ? MeetingAction.BlurBackground : MeetingAction.UnblurBackground); } }
+    public bool IsHandRaised { get => isHandRaised; set { if (value != IsHandRaised) _ = SendCommand(value ? MeetingAction.RaiseHand : MeetingAction.LowerHand); } }
+    public bool IsMuted { get => isMuted; set { if (value != IsMuted) _ = SendCommand(value ? MeetingAction.Mute : MeetingAction.Unmute); } }
+    public bool IsVideoOn { get => isVideoOn; set { if (value != IsVideoOn) _ = SendCommand(value ? MeetingAction.ShowVideo : MeetingAction.HideVideo); } }
+    public bool IsSharing { get => isSharing; set { if (value != IsSharing) _ = value ? SendCommand(MeetingAction.ToggleUI, ClientMessageParameterType.ToggleUiSharing) : _ = SendCommand(MeetingAction.StopSharing); } }
+
+    public bool IsRecordingOn { get => isRecordingOn; }
+    public bool IsInMeeting { get => isInMeeting; }
+
+    public bool HasUnreadMessages { get => hasUnreadMessages; }
+
     public bool IsConnected => ws is not null && ws.State == WebSocketState.Open;
 
-    public bool CanToggleMute { get; private set; }
-    public bool CanToggleVideo { get; private set; }
-    public bool CanToggleHand { get; private set; }
     public bool CanToggleBlur { get; private set; }
-    public bool CanToggleRecord { get; private set; }
+    public bool CanToggleHand { get; private set; }
+    public bool CanToggleMute { get; private set; }
+    public bool CanToggleShareTray { get; private set; }
+    public bool CanToggleVideo { get; private set; }
+
+    public bool CanToggleChat { get; private set; }
+    public bool CanStopSharing { get; private set; }
+
     public bool CanLeave { get; private set; }
+    public bool CanPair { get; private set; }
     public bool CanReact { get; private set; }
 
-    public string Manufacturer { get; set; } = "Elgato";
-    public string Device { get; set; } = "Stream Deck";
-
     private bool isMuted;
-    private bool isCameraOn;
+    private bool isVideoOn;
     private bool isHandRaised;
     private bool isInMeeting;
     private bool isRecordingOn;
     private bool isBackgroundBlurred;
+    private bool hasUnreadMessages;
+    private bool isSharing;
 
     private readonly SemaphoreSlim sendSemaphore       = new(1);
     private readonly SemaphoreSlim receiveSemaphore    = new(1);
     private readonly SemaphoreSlim connectingSemaphore = new(1);
-    private readonly bool autoConnect;
 
-    private readonly Uri Uri;
+    private readonly JsonSerializerOptions jsonSerializerOptions = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    private ClientInfo clientInfo;
+
     private ClientWebSocket? ws;
 
     public event EventHandler? Disconnected;
@@ -47,29 +63,19 @@ public class Client : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public Client(string? token = null, bool autoConnect = false, CancellationToken cancellationToken = default)
+    public event EventHandler<TokenReceivedEventArgs>? TokenReceived;
+    public event EventHandler<SuccessReceivedEventArgs>? SuccessReceived;
+    public event EventHandler<ErrorReceivedEventArgs>? ErrorReceived;
+
+    public Client(bool autoConnect = false, string manufacturer = "Ro.", string device = "TeamsApiClient", string app = "TeamsApiClient", string appVersion = "1.0.0", string? token = null, CancellationToken cancellationToken = default)
     {
-        if (token is null)
-        {
-            var teamsStoragePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Teams\storage.json");
-
-            if (!File.Exists(teamsStoragePath))
-                throw new FileNotFoundException(null, teamsStoragePath);
-
-            var options = JsonSerializer.Deserialize<TeamsStoragePartial>(File.ReadAllBytes(teamsStoragePath), new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            });
-
-            if (options == null || options.EnableThirdPartyDevicesService != true || !Guid.TryParse(options.TpdApiTokenString, out Guid autoToken))
-                throw new ArgumentException(null, nameof(token));
-
-            token = autoToken.ToString();
-        }
-
-        Uri = new($"ws://localhost:8124?token={token}");
-
-        this.autoConnect = autoConnect;
+        clientInfo = new() {
+            App = app,
+            AppVersion = appVersion,
+            Device = device,
+            Manufacturer = manufacturer,
+            Token = token
+        };
 
         if (autoConnect)
             _ = Connect(true, cancellationToken);
@@ -101,7 +107,7 @@ public class Client : INotifyPropertyChanged
         ws = null;
 
         if (initialState != WebSocketState.Closed)
-            Disconnected?.Invoke(this, EventArgs.Empty);
+            Disconnected?.Invoke(this, System.EventArgs.Empty);
     }
 
     public async Task Reconnect(bool waitForTeams, CancellationToken cancellationToken = default)
@@ -145,7 +151,7 @@ public class Client : INotifyPropertyChanged
                 {
                     if (ws.CloseStatus != WebSocketCloseStatus.NormalClosure)
                     {
-                        Disconnected?.Invoke(this, EventArgs.Empty);
+                        Disconnected?.Invoke(this, System.EventArgs.Empty);
                         _ = Reconnect(true, cancellationToken);
                     }
 
@@ -157,21 +163,33 @@ public class Client : INotifyPropertyChanged
 
                 var data = Encoding.UTF8.GetString(buffer, 0, result.Count);
 
-                var message = JsonSerializer.Deserialize<ServerMessage>(data, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                }) ?? throw new InvalidDataException();
+                var message = JsonSerializer.Deserialize<ServerMessage>(data, jsonSerializerOptions) ?? throw new InvalidDataException();
+
+                if (message.Response == "Success")
+                    SuccessReceived?.Invoke(this, new SuccessReceivedEventArgs(message.RequestId ?? 0));
 
                 if (!string.IsNullOrEmpty(message.ErrorMsg))
                 {
                     if (message.ErrorMsg.EndsWith("no active call"))
                         continue;
 
-                    throw new Exception(message.ErrorMsg);
+                    ErrorReceived?.Invoke(this, new ErrorReceivedEventArgs(message.ErrorMsg));
                 }
 
-                if (message.MeetingUpdate is null)
+                if (message.TokenRefresh is not null)
+                {
+                    clientInfo.Token = message.TokenRefresh;
+                    TokenReceived?.Invoke(this, new TokenReceivedEventArgs(message.TokenRefresh));
+                }
+
+                if (message.MeetingUpdate is null || message.MeetingUpdate.MeetingState is null)
                     continue;
+
+                if (isSharing != message.MeetingUpdate.MeetingState.IsSharing)
+                {
+                    isSharing = message.MeetingUpdate.MeetingState.IsSharing;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSharing)));
+                }
 
                 if (isMuted != message.MeetingUpdate.MeetingState.IsMuted)
                 {
@@ -179,10 +197,16 @@ public class Client : INotifyPropertyChanged
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMuted)));
                 }
 
-                if (isCameraOn != message.MeetingUpdate.MeetingState.IsCameraOn)
+                if (hasUnreadMessages != message.MeetingUpdate.MeetingState.HasUnreadMessages)
                 {
-                    isCameraOn = message.MeetingUpdate.MeetingState.IsCameraOn;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCameraOn)));
+                    hasUnreadMessages = message.MeetingUpdate.MeetingState.HasUnreadMessages;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasUnreadMessages)));
+                }
+
+                if (isVideoOn != message.MeetingUpdate.MeetingState.IsVideoOn)
+                {
+                    isVideoOn = message.MeetingUpdate.MeetingState.IsVideoOn;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsVideoOn)));
                 }
 
                 if (isHandRaised != message.MeetingUpdate.MeetingState.IsHandRaised)
@@ -215,6 +239,12 @@ public class Client : INotifyPropertyChanged
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanToggleMute)));
                 }
 
+                if (CanToggleShareTray != message.MeetingUpdate.MeetingPermissions.CanToggleShareTray)
+                {
+                    CanToggleShareTray = message.MeetingUpdate.MeetingPermissions.CanToggleShareTray;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanToggleShareTray)));
+                }
+
                 if (CanToggleVideo != message.MeetingUpdate.MeetingPermissions.CanToggleVideo)
                 {
                     CanToggleVideo = message.MeetingUpdate.MeetingPermissions.CanToggleVideo;
@@ -233,16 +263,28 @@ public class Client : INotifyPropertyChanged
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanToggleBlur)));
                 }
 
-                if (CanToggleRecord != message.MeetingUpdate.MeetingPermissions.CanToggleRecord)
+                if (CanToggleChat != message.MeetingUpdate.MeetingPermissions.CanToggleChat)
                 {
-                    CanToggleRecord = message.MeetingUpdate.MeetingPermissions.CanToggleRecord;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanToggleRecord)));
+                    CanToggleChat = message.MeetingUpdate.MeetingPermissions.CanToggleChat;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanToggleChat)));
+                }
+
+                if (CanStopSharing != message.MeetingUpdate.MeetingPermissions.CanStopSharing)
+                {
+                    CanStopSharing = message.MeetingUpdate.MeetingPermissions.CanStopSharing;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanStopSharing)));
                 }
 
                 if (CanLeave != message.MeetingUpdate.MeetingPermissions.CanLeave)
                 {
                     CanLeave = message.MeetingUpdate.MeetingPermissions.CanLeave;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanLeave)));
+                }
+
+                if (CanPair != message.MeetingUpdate.MeetingPermissions.CanPair)
+                {
+                    CanPair = message.MeetingUpdate.MeetingPermissions.CanPair;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanPair)));
                 }
 
                 if (CanReact != message.MeetingUpdate.MeetingPermissions.CanReact)
@@ -252,12 +294,13 @@ public class Client : INotifyPropertyChanged
                 }
             }
         }
+        catch (OperationCanceledException) { }
         finally
         {
             receiveSemaphore.Release();
 
             if (ws is not null && ws.State != WebSocketState.Open && ws.State != WebSocketState.Connecting)
-                _ = Reconnect(autoConnect, cancellationToken);
+                _ = Reconnect(true, cancellationToken);
         }
     }
 
@@ -267,10 +310,10 @@ public class Client : INotifyPropertyChanged
         {
             await connectingSemaphore.WaitAsync(cancellationToken);
 
-            if (Process.GetProcessesByName("Teams").Length == 0 && !waitForTeams)
+            if (Process.GetProcessesByName("ms-teams").Length == 0 && !waitForTeams)
                 return;
 
-            while (Process.GetProcessesByName("Teams").Length == 0)
+            while (Process.GetProcessesByName("ms-teams").Length == 0)
                 await Task.Delay(1000, cancellationToken);
 
             if (ws is not null)
@@ -297,16 +340,18 @@ public class Client : INotifyPropertyChanged
 
             ws = new();
 
-            await ws.ConnectAsync(Uri, cancellationToken);
+            var url = clientInfo.GetServerUrl();
+
+            await ws.ConnectAsync(url, cancellationToken);
 
             await WaitOpen(cancellationToken);
 
             if (ws.State != WebSocketState.Open)
                 throw new WebSocketException($"Invalid state after connect: ${ws.State}");
 
-            Connected?.Invoke(this, EventArgs.Empty);
+            Connected?.Invoke(this, System.EventArgs.Empty);
             Receive(cancellationToken);
-            await SendCommand(MeetingAction.QueryMeetingState, cancellationToken);
+            await SendCommand(MeetingAction.QueryMeetingState, null, cancellationToken);
         }
         finally
         {
@@ -314,13 +359,10 @@ public class Client : INotifyPropertyChanged
         }
     }
 
-    private async Task SendCommand(MeetingAction action, CancellationToken cancellationToken = default)
+    private async Task SendCommand(MeetingAction action, ClientMessageParameterType? type = null, CancellationToken cancellationToken = default)
     {
         if (ws is null)
         {
-            if (!autoConnect)
-                throw new InvalidOperationException("Not Connected");
-
             await Connect(true, cancellationToken);
         }
 
@@ -328,7 +370,7 @@ public class Client : INotifyPropertyChanged
         {
             case WebSocketState.Aborted:
             case WebSocketState.CloseReceived:
-                await Connect(autoConnect, cancellationToken);
+                await Connect(true, cancellationToken);
                 break;
             case WebSocketState.Connecting:
                 await WaitOpen(cancellationToken);
@@ -344,12 +386,11 @@ public class Client : INotifyPropertyChanged
         var message = JsonSerializer.Serialize(new ClientMessage()
         {
             Action = action,
-            Device = Device,
-            Manufacturer = Manufacturer,
-        }, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        });
+            Parameters = type is null ? null : new ClientMessageParameter
+            {
+                Type = type.Value
+            }
+        }, jsonSerializerOptions);
 
         try
         {
@@ -364,23 +405,26 @@ public class Client : INotifyPropertyChanged
     }
 
     public async Task LeaveCall(CancellationToken cancellationToken = default)
-        => await SendCommand(MeetingAction.LeaveCall, cancellationToken);
+        => await SendCommand(MeetingAction.LeaveCall, null, cancellationToken);
 
     public async Task ReactApplause(CancellationToken cancellationToken = default)
-        => await SendCommand(MeetingAction.ReactApplause, cancellationToken);
+        => await SendCommand(MeetingAction.React, ClientMessageParameterType.ReactApplause, cancellationToken);
 
     public async Task ReactLaugh(CancellationToken cancellationToken = default)
-        => await SendCommand(MeetingAction.ReactLaugh, cancellationToken);
+        => await SendCommand(MeetingAction.React, ClientMessageParameterType.ReactLaugh, cancellationToken);
 
     public async Task ReactLike(CancellationToken cancellationToken = default)
-        => await SendCommand(MeetingAction.ReactLike, cancellationToken);
+        => await SendCommand(MeetingAction.React, ClientMessageParameterType.ReactLike, cancellationToken);
 
     public async Task ReactLove(CancellationToken cancellationToken = default)
-        => await SendCommand(MeetingAction.ReactLove, cancellationToken);
+        => await SendCommand(MeetingAction.React, ClientMessageParameterType.ReactLove, cancellationToken);
 
     public async Task ReactWow(CancellationToken cancellationToken = default)
-        => await SendCommand(MeetingAction.ReactWow, cancellationToken);
+        => await SendCommand(MeetingAction.React, ClientMessageParameterType.ReactWow, cancellationToken);
 
     public async Task UpdateState(CancellationToken cancellationToken = default)
-        => await SendCommand(MeetingAction.QueryMeetingState, cancellationToken);
+        => await SendCommand(MeetingAction.QueryMeetingState, null, cancellationToken);
+
+    public async Task ToggleChat(CancellationToken cancellationToken = default)
+        => await SendCommand(MeetingAction.ToggleUI, ClientMessageParameterType.ToggleUiChat, cancellationToken);
 }

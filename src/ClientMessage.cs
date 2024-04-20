@@ -4,16 +4,17 @@ namespace Ro.Teams.LocalApi;
 
 internal class ClientMessage
 {
-    public string ApiVersion { get; set; } = "1.0.0";
-
     public MeetingAction Action { get; set; }
 
-    public MeetingService Service => (MeetingService)((int)Action >> 8);
+    public ClientMessageParameter? Parameters { get; set; }
 
-    [JsonConverter(typeof(UnixEpochDateTimeConverter))]
-    public DateTime Timestamp { get; set; } = DateTime.Now;
-    public string Manufacturer { get; set; } = "Elgato";
-    public string Device { get; set; } = "Stream Deck";
+    public int RequestId { get; set; }
+}
+
+internal class ClientMessageParameter
+{
+    [JsonPropertyName("type")]
+    public ClientMessageParameterType Type { get; set; }
 }
 
 [JsonConverter(typeof(JsonStringEnumMemberConverter))]
@@ -22,7 +23,7 @@ internal enum MeetingAction
     [JsonPropertyName("none")]
     None = 0,
 
-    [JsonPropertyName("query-meeting-state")]
+    [JsonPropertyName("query-state")]
     QueryMeetingState = 0b0000_0001_0000_0000,
 
     [JsonPropertyName("mute")]
@@ -43,7 +44,7 @@ internal enum MeetingAction
     UnblurBackground = 0b0000_0100_0000_0000,
     [JsonPropertyName("blur-background")]
     BlurBackground = 0b0000_0100_0000_0001,
-    [JsonPropertyName("toggle-blur-background")]
+    [JsonPropertyName("toggle-background-blur")]
     ToggleBlurBackground = 0b0000_0100_0000_0010,
 
     [JsonPropertyName("lower-hand")]
@@ -53,46 +54,44 @@ internal enum MeetingAction
     [JsonPropertyName("toggle-hand")]
     ToggleHand = 0b0000_0101_0000_0010,
 
-    [JsonPropertyName("stop-recording")]
-    StopRecording = 0b0000_0110_0000_0000,
-    [JsonPropertyName("start-recording")]
-    StartRecording = 0b0000_0110_0000_0001,
-    [JsonPropertyName("toggle-recording")]
-    ToggleRecording = 0b0000_0110_0000_0010,
+    //[JsonPropertyName("stop-recording")]
+    //StopRecording = 0b0000_0110_0000_0000,
+    //[JsonPropertyName("start-recording")]
+    //StartRecording = 0b0000_0110_0000_0001,
+    //[JsonPropertyName("toggle-recording")]
+    //ToggleRecording = 0b0000_0110_0000_0010,
 
     [JsonPropertyName("leave-call")]
     LeaveCall = 0b0000_0111_0000_0000,
 
-    [JsonPropertyName("react-applause")]
-    ReactApplause = 0b0000_0111_0001_0000,
-    [JsonPropertyName("react-laugh")]
-    ReactLaugh = 0b0000_0111_0001_0001,
-    [JsonPropertyName("react-like")]
-    ReactLike = 0b0000_0111_0001_0010,
-    [JsonPropertyName("react-love")]
-    ReactLove = 0b0000_0111_0001_0011,
-    [JsonPropertyName("react-wow")]
-    ReactWow = 0b0000_0111_0001_0100,
+    [JsonPropertyName("send-react")]
+    React     = 0b0000_1000_0000_0000,
+
+    [JsonPropertyName("toggle-ui")]
+    ToggleUI  = 0b0000_1001_0000_0000,
+
+    [JsonPropertyName("stop-sharing")]
+    StopSharing = 0b0000_1010_0000_0000,
 }
 
-[JsonConverter(typeof(JsonStringEnumMemberConverter))]
-internal enum MeetingService
-{
-    [JsonPropertyName("none")]
-    None = 0,
 
-    [JsonPropertyName("query-meeting-state")]
-    QueryMeetingState = 0b0000_0001,
-    [JsonPropertyName("toggle-mute")]
-    ToggleMute = 0b0000_0010,
-    [JsonPropertyName("toggle-video")]
-    ToggleVideo = 0b0000_0011,
-    [JsonPropertyName("background-blur")]
-    BackgroundBlur = 0b0000_0100,
-    [JsonPropertyName("raise-hand")]
-    RaiseHand = 0b0000_0101,
-    [JsonPropertyName("recording")]
-    Recording = 0b0000_0110,
-    [JsonPropertyName("call")]
-    Call = 0b0000_0111,
+[JsonConverter(typeof(JsonStringEnumMemberConverter))]
+internal enum ClientMessageParameterType
+{
+    [JsonPropertyName("applause")]
+    ReactApplause = 0b0000_0111_0001_0000,
+    [JsonPropertyName("laugh")]
+    ReactLaugh    = 0b0000_0111_0001_0001,
+    [JsonPropertyName("like")]
+    ReactLike     = 0b0000_0111_0001_0010,
+    [JsonPropertyName("love")]
+    ReactLove     = 0b0000_0111_0001_0011,
+    [JsonPropertyName("wow")]
+    ReactWow      = 0b0000_0111_0001_0100,
+
+    [JsonPropertyName("chat")]
+    ToggleUiChat    = 0b0000_1001_0000_0001,
+    [JsonPropertyName("sharing-tray")]
+    ToggleUiSharing = 0b0000_1001_0000_0010,
+
 }
