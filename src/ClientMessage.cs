@@ -93,6 +93,6 @@ internal enum ClientMessageParameterType
 
     [JsonStringEnumMemberName("chat")]
     ToggleUiChat    = 0b0000_1001_0000_0001,
-    [JsonStringEnumMemberName("sharing-tray")]
+    [JsonStringEnumMemberName("share-tray")]
     ToggleUiSharing = 0b0000_1001_0000_0010,
 }

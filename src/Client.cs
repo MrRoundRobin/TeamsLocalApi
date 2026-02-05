@@ -70,7 +70,7 @@ public class Client : INotifyPropertyChanged, IDisposable
     public event EventHandler<ErrorReceivedEventArgs>? ErrorReceived;
 
     private readonly string teamsProcessName;
-    private int requestId;
+    private int requestId = 1;
 
     public Client(bool autoConnect = false, string manufacturer = "Ro.", string device = "TeamsApiClient", string app = "TeamsApiClient", string appVersion = "1.0.0", string? token = null, CancellationToken cancellationToken = default)
     {
@@ -87,7 +87,6 @@ public class Client : INotifyPropertyChanged, IDisposable
         } else {
             teamsProcessName = "ms-teams";
         }
-        requestId = 1;
 
         if (autoConnect)
             _ = Connect(true, cancellationToken);
@@ -205,6 +204,7 @@ public class Client : INotifyPropertyChanged, IDisposable
                 {
                     clientInfo.Token = message.TokenRefresh;
                     TokenReceived?.Invoke(this, new TokenReceivedEventArgs(message.TokenRefresh));
+                    await SendCommand(MeetingAction.QueryMeetingState, null, cancellationToken);
                 }
 
                 if (message.MeetingUpdate is null || message.MeetingUpdate.MeetingState is null)
@@ -376,10 +376,10 @@ public class Client : INotifyPropertyChanged, IDisposable
 
             Connected?.Invoke(this, System.EventArgs.Empty);
             Receive(cancellationToken);
-            if (string.IsNullOrWhiteSpace(clientInfo.Token)) {
+            if (string.IsNullOrWhiteSpace(clientInfo.Token))
                 await SendCommand(MeetingAction.Pair, null, cancellationToken);
-            }
-            await SendCommand(MeetingAction.QueryMeetingState, null, cancellationToken);
+            else
+                await SendCommand(MeetingAction.QueryMeetingState, null, cancellationToken);
         }
         finally
         {
