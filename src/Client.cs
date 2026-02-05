@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Ro.Teams.LocalApi.EventArgs;
@@ -67,6 +68,9 @@ public class Client : INotifyPropertyChanged
     public event EventHandler<SuccessReceivedEventArgs>? SuccessReceived;
     public event EventHandler<ErrorReceivedEventArgs>? ErrorReceived;
 
+    private readonly string teamsProcessName;
+    private int requestId;
+
     public Client(bool autoConnect = false, string manufacturer = "Ro.", string device = "TeamsApiClient", string app = "TeamsApiClient", string appVersion = "1.0.0", string? token = null, CancellationToken cancellationToken = default)
     {
         clientInfo = new() {
@@ -76,6 +80,13 @@ public class Client : INotifyPropertyChanged
             Manufacturer = manufacturer,
             Token = token
         };
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            teamsProcessName = "MSTeams";
+        } else {
+            teamsProcessName = "ms-teams";
+        }
+        requestId = 1;
 
         if (autoConnect)
             _ = Connect(true, cancellationToken);
@@ -310,10 +321,10 @@ public class Client : INotifyPropertyChanged
         {
             await connectingSemaphore.WaitAsync(cancellationToken);
 
-            if (Process.GetProcessesByName("ms-teams").Length == 0 && !waitForTeams)
+            if (Process.GetProcessesByName(teamsProcessName).Length == 0 && !waitForTeams)
                 return;
 
-            while (Process.GetProcessesByName("ms-teams").Length == 0)
+            while (Process.GetProcessesByName(teamsProcessName).Length == 0)
                 await Task.Delay(1000, cancellationToken);
 
             if (ws is not null)
@@ -351,6 +362,9 @@ public class Client : INotifyPropertyChanged
 
             Connected?.Invoke(this, System.EventArgs.Empty);
             Receive(cancellationToken);
+            if (string.IsNullOrWhiteSpace(clientInfo.Token)) {
+                await SendCommand(MeetingAction.Pair, null, cancellationToken);
+            }
             await SendCommand(MeetingAction.QueryMeetingState, null, cancellationToken);
         }
         finally
@@ -389,7 +403,8 @@ public class Client : INotifyPropertyChanged
             Parameters = type is null ? null : new ClientMessageParameter
             {
                 Type = type.Value
-            }
+            },
+            RequestId = requestId++
         }, jsonSerializerOptions);
 
         try
@@ -427,4 +442,6 @@ public class Client : INotifyPropertyChanged
 
     public async Task ToggleChat(CancellationToken cancellationToken = default)
         => await SendCommand(MeetingAction.ToggleUI, ClientMessageParameterType.ToggleUiChat, cancellationToken);
+    public async Task Pair(CancellationToken cancellationToken = default)
+        => await SendCommand(MeetingAction.Pair, null, cancellationToken);
 }

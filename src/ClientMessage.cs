@@ -23,6 +23,9 @@ internal enum MeetingAction
     [JsonPropertyName("none")]
     None = 0,
 
+    [JsonPropertyName("pair")]
+    Pair = 0b0000_0001_0000_0001,
+
     [JsonPropertyName("query-state")]
     QueryMeetingState = 0b0000_0001_0000_0000,
 
