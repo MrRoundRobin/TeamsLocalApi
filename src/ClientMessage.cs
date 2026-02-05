@@ -13,88 +13,86 @@ internal class ClientMessage
 
 internal class ClientMessageParameter
 {
-    [JsonPropertyName("type")]
     public ClientMessageParameterType Type { get; set; }
 }
 
-[JsonConverter(typeof(JsonStringEnumMemberConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter))]
 internal enum MeetingAction
 {
-    [JsonPropertyName("none")]
+    [JsonStringEnumMemberName("none")]
     None = 0,
 
-    [JsonPropertyName("pair")]
+    [JsonStringEnumMemberName("pair")]
     Pair = 0b0000_0001_0000_0001,
 
-    [JsonPropertyName("query-state")]
+    [JsonStringEnumMemberName("query-state")]
     QueryMeetingState = 0b0000_0001_0000_0000,
 
-    [JsonPropertyName("mute")]
+    [JsonStringEnumMemberName("mute")]
     Mute = 0b0000_0010_0000_0000,
-    [JsonPropertyName("unmute")]
+    [JsonStringEnumMemberName("unmute")]
     Unmute = 0b0000_0010_0000_0001,
-    [JsonPropertyName("toggle-mute")]
+    [JsonStringEnumMemberName("toggle-mute")]
     ToggleMute = 0b0000_0010_0000_0010,
 
-    [JsonPropertyName("hide-video")]
+    [JsonStringEnumMemberName("hide-video")]
     HideVideo = 0b0000_0011_0000_0000,
-    [JsonPropertyName("show-video")]
+    [JsonStringEnumMemberName("show-video")]
     ShowVideo = 0b0000_0011_0000_0001,
-    [JsonPropertyName("toggle-video")]
+    [JsonStringEnumMemberName("toggle-video")]
     ToggleVideo = 0b0000_0011_0000_0010,
 
-    [JsonPropertyName("unblur-background")]
+    [JsonStringEnumMemberName("unblur-background")]
     UnblurBackground = 0b0000_0100_0000_0000,
-    [JsonPropertyName("blur-background")]
+    [JsonStringEnumMemberName("blur-background")]
     BlurBackground = 0b0000_0100_0000_0001,
-    [JsonPropertyName("toggle-background-blur")]
+    [JsonStringEnumMemberName("toggle-background-blur")]
     ToggleBlurBackground = 0b0000_0100_0000_0010,
 
-    [JsonPropertyName("lower-hand")]
+    [JsonStringEnumMemberName("lower-hand")]
     LowerHand = 0b0000_0101_0000_0000,
-    [JsonPropertyName("raise-hand")]
+    [JsonStringEnumMemberName("raise-hand")]
     RaiseHand = 0b0000_0101_0000_0001,
-    [JsonPropertyName("toggle-hand")]
+    [JsonStringEnumMemberName("toggle-hand")]
     ToggleHand = 0b0000_0101_0000_0010,
 
-    //[JsonPropertyName("stop-recording")]
+    //[JsonStringEnumMemberName("stop-recording")]
     //StopRecording = 0b0000_0110_0000_0000,
-    //[JsonPropertyName("start-recording")]
+    //[JsonStringEnumMemberName("start-recording")]
     //StartRecording = 0b0000_0110_0000_0001,
-    //[JsonPropertyName("toggle-recording")]
+    //[JsonStringEnumMemberName("toggle-recording")]
     //ToggleRecording = 0b0000_0110_0000_0010,
 
-    [JsonPropertyName("leave-call")]
+    [JsonStringEnumMemberName("leave-call")]
     LeaveCall = 0b0000_0111_0000_0000,
 
-    [JsonPropertyName("send-react")]
+    [JsonStringEnumMemberName("send-reaction")]
     React     = 0b0000_1000_0000_0000,
 
-    [JsonPropertyName("toggle-ui")]
+    [JsonStringEnumMemberName("toggle-ui")]
     ToggleUI  = 0b0000_1001_0000_0000,
 
-    [JsonPropertyName("stop-sharing")]
+    [JsonStringEnumMemberName("stop-sharing")]
     StopSharing = 0b0000_1010_0000_0000,
 }
 
 
-[JsonConverter(typeof(JsonStringEnumMemberConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter))]
 internal enum ClientMessageParameterType
 {
-    [JsonPropertyName("applause")]
+    [JsonStringEnumMemberName("applause")]
     ReactApplause = 0b0000_0111_0001_0000,
-    [JsonPropertyName("laugh")]
+    [JsonStringEnumMemberName("laugh")]
     ReactLaugh    = 0b0000_0111_0001_0001,
-    [JsonPropertyName("like")]
+    [JsonStringEnumMemberName("like")]
     ReactLike     = 0b0000_0111_0001_0010,
-    [JsonPropertyName("love")]
+    [JsonStringEnumMemberName("love")]
     ReactLove     = 0b0000_0111_0001_0011,
-    [JsonPropertyName("wow")]
+    [JsonStringEnumMemberName("wow")]
     ReactWow      = 0b0000_0111_0001_0100,
 
-    [JsonPropertyName("chat")]
+    [JsonStringEnumMemberName("chat")]
     ToggleUiChat    = 0b0000_1001_0000_0001,
-    [JsonPropertyName("sharing-tray")]
+    [JsonStringEnumMemberName("sharing-tray")]
     ToggleUiSharing = 0b0000_1001_0000_0010,
-
 }

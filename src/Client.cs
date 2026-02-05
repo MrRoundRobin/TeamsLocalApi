@@ -4,11 +4,12 @@ using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Ro.Teams.LocalApi.EventArgs;
 
 namespace Ro.Teams.LocalApi;
 
-public class Client : INotifyPropertyChanged
+public class Client : INotifyPropertyChanged, IDisposable
 {
     public bool IsBackgroundBlurred { get => isBackgroundBlurred; set { if (value != IsBackgroundBlurred) _ = SendCommand(value ? MeetingAction.BlurBackground : MeetingAction.UnblurBackground); } }
     public bool IsHandRaised { get => isHandRaised; set { if (value != IsHandRaised) _ = SendCommand(value ? MeetingAction.RaiseHand : MeetingAction.LowerHand); } }
@@ -16,10 +17,10 @@ public class Client : INotifyPropertyChanged
     public bool IsVideoOn { get => isVideoOn; set { if (value != IsVideoOn) _ = SendCommand(value ? MeetingAction.ShowVideo : MeetingAction.HideVideo); } }
     public bool IsSharing { get => isSharing; set { if (value != IsSharing) _ = value ? SendCommand(MeetingAction.ToggleUI, ClientMessageParameterType.ToggleUiSharing) : _ = SendCommand(MeetingAction.StopSharing); } }
 
-    public bool IsRecordingOn { get => isRecordingOn; }
-    public bool IsInMeeting { get => isInMeeting; }
+    public bool IsRecordingOn => isRecordingOn;
+    public bool IsInMeeting => isInMeeting;
 
-    public bool HasUnreadMessages { get => hasUnreadMessages; }
+    public bool HasUnreadMessages => hasUnreadMessages;
 
     public bool IsConnected => ws is not null && ws.State == WebSocketState.Open;
 
@@ -51,7 +52,7 @@ public class Client : INotifyPropertyChanged
 
     private readonly JsonSerializerOptions jsonSerializerOptions = new()
     {
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
@@ -121,6 +122,15 @@ public class Client : INotifyPropertyChanged
             Disconnected?.Invoke(this, System.EventArgs.Empty);
     }
 
+    public void Dispose()
+    {
+        ws?.Dispose();
+        sendSemaphore.Dispose();
+        receiveSemaphore.Dispose();
+        connectingSemaphore.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
     public async Task Reconnect(bool waitForTeams, CancellationToken cancellationToken = default)
     {
         await Disconnect(cancellationToken);
@@ -175,6 +185,10 @@ public class Client : INotifyPropertyChanged
                 var data = Encoding.UTF8.GetString(buffer, 0, result.Count);
 
                 var message = JsonSerializer.Deserialize<ServerMessage>(data, jsonSerializerOptions) ?? throw new InvalidDataException();
+
+#if DEBUG
+                Debugger.Log(0, "Client.Receive", $"Received: {data}\n");
+#endif
 
                 if (message.Response == "Success")
                     SuccessReceived?.Invoke(this, new SuccessReceivedEventArgs(message.RequestId ?? 0));
@@ -406,6 +420,10 @@ public class Client : INotifyPropertyChanged
             },
             RequestId = requestId++
         }, jsonSerializerOptions);
+
+#if DEBUG
+        Debugger.Log(0, "Client.SendCommand", $"Sending: {message}\n");
+#endif
 
         try
         {

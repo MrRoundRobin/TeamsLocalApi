@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
@@ -13,11 +13,11 @@
     <RepositoryUrl>https://github.com/MrRoundRobin/TeamsLocalApi.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Microsoft Teams; API</PackageTags>
-    <PackageReleaseNotes>improved resilience &amp; error handling</PackageReleaseNotes>
+    <PackageReleaseNotes>Added Support for authentication</PackageReleaseNotes>
     <PackageId>$(AssemblyName)</PackageId>
     <Description>API Client for the client side Teams API</Description>
     <PackageProjectUrl>https://github.com/MrRoundRobin/TeamsLocalApi</PackageProjectUrl>
-    <AssemblyVersion>0.4.0.0</AssemblyVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>$(AssemblyVersion)</FileVersion>
     <Version>$(AssemblyVersion)</Version>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -38,10 +38,6 @@
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Macross.Json.Extensions" Version="3.0.0" />
   </ItemGroup>
 
 </Project>

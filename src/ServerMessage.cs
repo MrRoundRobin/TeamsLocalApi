@@ -2,7 +2,7 @@
 
 internal class ServerMessage
 {
-    public int? RequestId = 0;
+    public int? RequestId { get; set; }
     public string? Response { get; set; }
     public string? ErrorMsg { get; set; }
     public string? TokenRefresh { get; set; }
@@ -13,7 +13,6 @@ internal class MeetingUpdate
 {
     public MeetingState? MeetingState { get; set; }
     public MeetingPermissions MeetingPermissions { get; set; } = new();
-
 }
 
 internal class MeetingState
